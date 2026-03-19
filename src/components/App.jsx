@@ -10,6 +10,7 @@ import AddPersonModal from './modals/AddPersonModal';
 import AddOrgModal from './modals/AddOrgModal';
 import AddConnectionModal from './modals/AddConnectionModal';
 import AddMembershipModal from './modals/AddMembershipModal';
+import BatchImportModal from './modals/BatchImportModal';
 
 export default function App() {
   const fetchCampaigns = useStore((s) => s.fetchCampaigns);
@@ -52,6 +53,7 @@ export default function App() {
         <AddOrgModal />
         <AddConnectionModal />
         <AddMembershipModal />
+        <BatchImportModal />
       </Box>
     </ThemeProvider>
   );
