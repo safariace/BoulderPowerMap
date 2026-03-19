@@ -171,12 +171,15 @@ const useStore = create(
       addOrgModalOpen: false,
       addConnectionModalOpen: false,
       addMembershipModalOpen: false,
+      batchImportModalOpen: false,
       connectionModalSourceId: null,
       connectionModalSourceType: null,
       membershipModalOrgId: null,
 
       openAddPersonModal: () => set({ addPersonModalOpen: true }),
       closeAddPersonModal: () => set({ addPersonModalOpen: false }),
+      openBatchImportModal: () => set({ batchImportModalOpen: true }),
+      closeBatchImportModal: () => set({ batchImportModalOpen: false }),
       openAddOrgModal: () => set({ addOrgModalOpen: true }),
       closeAddOrgModal: () => set({ addOrgModalOpen: false }),
       openAddConnectionModal: (sourceId = null, sourceType = null) =>
