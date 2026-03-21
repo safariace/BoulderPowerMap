@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Box, CircularProgress, Typography } from '@mui/material';
+import { version } from '../../package.json';
 import rpmTheme from '../theme/theme';
 import useStore from '../store/useStore';
 import Toolbar from './common/Toolbar';
@@ -41,7 +42,7 @@ export default function App() {
               <Typography variant="body2">{graphError}</Typography>
             </Box>
           )}
-          {!graphLoading && !graphError && activeCampaignId && <PowerMapCanvas />}
+          {!graphError && activeCampaignId && <PowerMapCanvas />}
           {!activeCampaignId && !graphLoading && (
             <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', textAlign: 'center', p: 4 }}>
               <Typography variant="h2" sx={{ color: 'text.secondary', mb: 1 }}>No Campaign Selected</Typography>
@@ -50,6 +51,9 @@ export default function App() {
           )}
         </Box>
         <InspectorSidebar />
+        <Typography variant="caption" sx={{ position: 'fixed', bottom: 8, right: 12, zIndex: 9999, opacity: 0.35, pointerEvents: 'none', fontFamily: 'monospace' }}>
+          v{version}
+        </Typography>
         <AddPersonModal />
         <AddOrgModal />
         <AddConnectionModal />

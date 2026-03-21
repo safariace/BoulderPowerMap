@@ -29,9 +29,11 @@ export default function InspectorSidebar() {
   const deletePerson = useStore((s) => s.deletePerson);
   const deleteOrg = useStore((s) => s.deleteOrg);
   const persons = useStore((s) => s.persons);
+  const storeConnections = useStore((s) => s.connections);
+  const storeMemberships = useStore((s) => s.memberships);
 
-  const connections = useMemo(() => selectedNodeId ? getNodeConnections(selectedNodeId) : [], [selectedNodeId]);
-  const orgMembers = useMemo(() => (selectedNodeType === 'organization' && selectedNodeId) ? getOrgMembers(selectedNodeId) : null, [selectedNodeId, selectedNodeType]);
+  const connections = useMemo(() => selectedNodeId ? getNodeConnections(selectedNodeId) : [], [selectedNodeId, storeConnections]);
+  const orgMembers = useMemo(() => (selectedNodeType === 'organization' && selectedNodeId) ? getOrgMembers(selectedNodeId) : null, [selectedNodeId, selectedNodeType, storeMemberships]);
 
   if (!entity) return null;
 
