@@ -110,12 +110,18 @@ export const connectionsApi = {
 // ── Campaign Assignments ────────────────────────────────────────────────
 
 export const campaignAssignApi = {
-  addPerson: async (campaignId, personId) =>
-    throwOnError(await supabase.from('campaign_persons').insert({ campaign_id: campaignId, person_id: personId }).select().single()),
+  addPerson: async (campaignId, personId, campaignInfluence = null) => {
+    const row = { campaign_id: campaignId, person_id: personId };
+    if (campaignInfluence !== null) row.campaign_influence = campaignInfluence;
+    return throwOnError(await supabase.from('campaign_persons').upsert(row, { onConflict: 'campaign_id,person_id' }).select().single());
+  },
   removePerson: async (campaignId, personId) =>
     throwOnError(await supabase.from('campaign_persons').delete().match({ campaign_id: campaignId, person_id: personId })),
-  addOrg: async (campaignId, orgId) =>
-    throwOnError(await supabase.from('campaign_orgs').insert({ campaign_id: campaignId, org_id: orgId }).select().single()),
+  addOrg: async (campaignId, orgId, campaignInfluence = null) => {
+    const row = { campaign_id: campaignId, org_id: orgId };
+    if (campaignInfluence !== null) row.campaign_influence = campaignInfluence;
+    return throwOnError(await supabase.from('campaign_orgs').upsert(row, { onConflict: 'campaign_id,org_id' }).select().single());
+  },
   removeOrg: async (campaignId, orgId) =>
     throwOnError(await supabase.from('campaign_orgs').delete().match({ campaign_id: campaignId, org_id: orgId })),
 };
@@ -131,32 +137,43 @@ export const graphApi = {
    *   - All org memberships for those orgs
    */
   fetchGraph: async (campaignId) => {
-    // 1. Get persons in campaign
+    // 1. Get persons in campaign (with campaign-specific influence)
     const personLinks = throwOnError(
-      await supabase.from('campaign_persons').select('person_id').eq('campaign_id', campaignId)
+      await supabase.from('campaign_persons').select('person_id, campaign_influence').eq('campaign_id', campaignId)
     );
     const personIds = personLinks.map((p) => p.person_id);
+    const personInfluenceMap = new Map(
+      personLinks.filter((p) => p.campaign_influence != null).map((p) => [p.person_id, p.campaign_influence])
+    );
 
-    // 2. Get orgs in campaign
+    // 2. Get orgs in campaign (with campaign-specific influence)
     const orgLinks = throwOnError(
-      await supabase.from('campaign_orgs').select('org_id').eq('campaign_id', campaignId)
+      await supabase.from('campaign_orgs').select('org_id, campaign_influence').eq('campaign_id', campaignId)
     );
     const orgIds = orgLinks.map((o) => o.org_id);
+    const orgInfluenceMap = new Map(
+      orgLinks.filter((o) => o.campaign_influence != null).map((o) => [o.org_id, o.campaign_influence])
+    );
 
-    // 3. Fetch full person records
+    // 3. Fetch full person records, override with campaign influence where set
     let persons = [];
     if (personIds.length > 0) {
-      persons = throwOnError(
-        await supabase.from('persons').select('*, chaperone:persons!chaperone_id(id, name)')
-          .in('id', personIds)
+      const raw = throwOnError(
+        await supabase.from('persons').select('*, chaperone:persons!chaperone_id(id, name)').in('id', personIds)
+      );
+      persons = raw.map((p) =>
+        personInfluenceMap.has(p.id) ? { ...p, influence_score: personInfluenceMap.get(p.id) } : p
       );
     }
 
-    // 4. Fetch full org records
+    // 4. Fetch full org records, override with campaign influence where set
     let organizations = [];
     if (orgIds.length > 0) {
-      organizations = throwOnError(
+      const raw = throwOnError(
         await supabase.from('organizations').select('*').in('id', orgIds)
+      );
+      organizations = raw.map((o) =>
+        orgInfluenceMap.has(o.id) ? { ...o, influence_score: orgInfluenceMap.get(o.id) } : o
       );
     }
 

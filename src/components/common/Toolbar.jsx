@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Select, MenuItem, FormControl, InputLabel, Button, Typography, Chip, alpha } from '@mui/material';
-import { PersonAdd, Business, Link as LinkIcon, Upload } from '@mui/icons-material';
+import { PersonAdd, Business, Link as LinkIcon, PlaylistAdd } from '@mui/icons-material';
 import useStore from '../../store/useStore';
 
 export default function Toolbar() {
@@ -13,7 +13,7 @@ export default function Toolbar() {
   const openAddPersonModal = useStore((s) => s.openAddPersonModal);
   const openAddOrgModal = useStore((s) => s.openAddOrgModal);
   const openAddConnectionModal = useStore((s) => s.openAddConnectionModal);
-  const openBatchImportModal = useStore((s) => s.openBatchImportModal);
+  const openAssignModal = useStore((s) => s.openAssignModal);
 
   return (
     <Box sx={{
@@ -54,9 +54,9 @@ export default function Toolbar() {
             sx={{ bgcolor: 'background.paper', boxShadow: 2, '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.06) } }}>
             Add Connection
           </Button>
-          <Button variant="outlined" startIcon={<Upload />} onClick={openBatchImportModal}
+          <Button variant="outlined" startIcon={<PlaylistAdd />} onClick={openAssignModal}
             sx={{ bgcolor: 'background.paper', boxShadow: 2, '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.06) } }}>
-            Import
+            Assign
           </Button>
         </Box>
       )}

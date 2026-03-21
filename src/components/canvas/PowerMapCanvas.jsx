@@ -8,24 +8,55 @@
  *   - Click-to-select with GSAP camera pan
  */
 
-import React, { useEffect, useRef } from 'react';
-import { Box } from '@mui/material';
+import React, { useEffect, useRef, useState } from 'react';
+import { Box, Paper, Typography, alpha } from '@mui/material';
 import useStore from '../../store/useStore';
+import { inferStature } from '../../store/useStore';
+import { palette } from '../../theme/theme';
+
+const STATURE_LABEL = ['Participant', 'Influencer', 'Decider'];
+const ROLE_COLOR = { ally: palette.ally, champion: palette.champion, neutral: palette.neutral, target: palette.target, opponent: palette.opponent };
 
 export default function PowerMapCanvas() {
   const containerRef = useRef(null);
   const engineRef = useRef(null);
+  const mousePosRef = useRef({ x: 0, y: 0 });
+  const [tooltip, setTooltip] = useState(null); // { x, y, entity }
 
   const persons = useStore((s) => s.persons);
   const organizations = useStore((s) => s.organizations);
   const connections = useStore((s) => s.connections);
   const filters = useStore((s) => s.filters);
   const selectedNodeId = useStore((s) => s.selectedNodeId);
+  const hoveredNodeId = useStore((s) => s.hoveredNodeId);
   const selectNode = useStore((s) => s.selectNode);
   const hoverNode = useStore((s) => s.hoverNode);
   const getAllNodes = useStore((s) => s.getAllNodes);
   const getFilteredConnections = useStore((s) => s.getFilteredConnections);
   const settings = useStore((s) => s.settings);
+
+  // Track mouse position for tooltip placement
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      const r = el.getBoundingClientRect();
+      mousePosRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+    el.addEventListener('mousemove', onMove);
+    return () => el.removeEventListener('mousemove', onMove);
+  }, []);
+
+  // Update tooltip when hovered node changes
+  useEffect(() => {
+    if (!hoveredNodeId) { setTooltip(null); return; }
+    const entity =
+      persons.find((p) => p.id === hoveredNodeId) ||
+      organizations.find((o) => o.id === hoveredNodeId);
+    if (entity) {
+      setTooltip({ x: mousePosRef.current.x, y: mousePosRef.current.y, entity });
+    }
+  }, [hoveredNodeId, persons, organizations]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -217,5 +248,64 @@ export default function PowerMapCanvas() {
     return () => { sim.stop(); app.ticker.remove(renderTick); };
   }, [persons, organizations, connections, filters, selectedNodeId, settings.labelDisplayMode]);
 
-  return <Box ref={containerRef} sx={{ width: '100%', height: '100%', '& canvas': { display: 'block' } }} />;
+  return (
+    <Box ref={containerRef} sx={{ width: '100%', height: '100%', position: 'relative', '& canvas': { display: 'block' } }}>
+      {tooltip && (() => {
+        const e = tooltip.entity;
+        const isPerson = e._type === 'person';
+        const stature = inferStature(e.influence_score || 0);
+        const roleColor = isPerson ? (ROLE_COLOR[e.role_category] || palette.neutral) : palette.navy;
+        // Flip tooltip left if near right edge
+        const flipX = tooltip.x > (containerRef.current?.clientWidth || 800) - 220;
+        return (
+          <Paper elevation={6} sx={{
+            position: 'absolute',
+            left: flipX ? 'auto' : tooltip.x + 14,
+            right: flipX ? (containerRef.current?.clientWidth - tooltip.x + 14) : 'auto',
+            top: tooltip.y - 10,
+            zIndex: 20,
+            p: 1.5,
+            minWidth: 180,
+            maxWidth: 240,
+            pointerEvents: 'none',
+            bgcolor: alpha(palette.ink, 0.93),
+            color: palette.parchment,
+            backdropFilter: 'blur(10px)',
+            borderRadius: 2,
+            border: `1px solid ${alpha(palette.parchment, 0.1)}`,
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: roleColor, flexShrink: 0 }} />
+              <Typography variant="body2" sx={{ fontWeight: 700, color: palette.parchment, lineHeight: 1.2 }}>
+                {e.name}
+              </Typography>
+            </Box>
+            {isPerson && e.primary_role && (
+              <Typography variant="caption" sx={{ color: palette.stone, display: 'block', pl: '20px' }}>
+                {e.primary_role}
+              </Typography>
+            )}
+            {isPerson && e.primary_org_name && (
+              <Typography variant="caption" sx={{ color: alpha(palette.parchment, 0.6), display: 'block', pl: '20px' }}>
+                {e.primary_org_name}
+              </Typography>
+            )}
+            {!isPerson && e.org_type && (
+              <Typography variant="caption" sx={{ color: palette.stone, display: 'block', pl: '20px' }}>
+                {e.org_type}{e.category ? ` · ${e.category}` : ''}
+              </Typography>
+            )}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.75, pl: '20px' }}>
+              <Typography variant="caption" sx={{ color: palette.teal, fontWeight: 600 }}>
+                {e.influence_score ?? 50}
+              </Typography>
+              <Typography variant="caption" sx={{ color: palette.stone }}>
+                influence · {STATURE_LABEL[stature]}
+              </Typography>
+            </Box>
+          </Paper>
+        );
+      })()}
+    </Box>
+  );
 }
