@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, Autocomplete, TextField, Slider, Typography,
-  ToggleButton, ToggleButtonGroup, Box, Alert,
+  ToggleButton, ToggleButtonGroup, Box, Alert, FormControlLabel,
+  Checkbox, Divider, CircularProgress,
 } from '@mui/material';
-import { PersonAdd, Business } from '@mui/icons-material';
-import { personsApi, orgsApi, campaignAssignApi } from '../../api/supabase';
+import { PersonAdd, Business, Group } from '@mui/icons-material';
+import { personsApi, orgsApi, campaignAssignApi, membershipsApi } from '../../api/supabase';
 import useStore, { inferStature } from '../../store/useStore';
 
 const STATURE_LABEL = ['Participant', 'Influencer', 'Decider'];
@@ -21,6 +22,9 @@ export default function AssignToCampaignModal() {
   const [allOrgs, setAllOrgs] = useState([]);
   const [selected, setSelected] = useState(null);
   const [influence, setInfluence] = useState(50);
+  const [includeMembers, setIncludeMembers] = useState(true);
+  const [orgMembers, setOrgMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -29,10 +33,25 @@ export default function AssignToCampaignModal() {
       setSelected(null);
       setInfluence(50);
       setError('');
+      setOrgMembers([]);
+      setIncludeMembers(true);
       personsApi.list().then(setAllPersons).catch(console.error);
       orgsApi.list().then(setAllOrgs).catch(console.error);
     }
   }, [open]);
+
+  // When org is selected, fetch its members
+  useEffect(() => {
+    if (selected && entityType === 'org') {
+      setLoadingMembers(true);
+      membershipsApi.listForOrg(selected.id)
+        .then(setOrgMembers)
+        .catch(console.error)
+        .finally(() => setLoadingMembers(false));
+    } else {
+      setOrgMembers([]);
+    }
+  }, [selected, entityType]);
 
   useEffect(() => {
     if (selected) setInfluence(selected.influence_score ?? 50);
@@ -42,6 +61,7 @@ export default function AssignToCampaignModal() {
     if (!v) return;
     setEntityType(v);
     setSelected(null);
+    setOrgMembers([]);
   };
 
   const handleAssign = async () => {
@@ -52,7 +72,17 @@ export default function AssignToCampaignModal() {
       if (entityType === 'person') {
         await campaignAssignApi.addPerson(activeCampaignId, selected.id, influence);
       } else {
+        // Assign the org
         await campaignAssignApi.addOrg(activeCampaignId, selected.id, influence);
+        // Auto-assign all org members so their connections show up
+        if (includeMembers && orgMembers.length > 0) {
+          await Promise.all(
+            orgMembers.map((m) =>
+              campaignAssignApi.addPerson(activeCampaignId, m.person_id, null)
+                .catch(() => { /* already in campaign — upsert handles it */ })
+            )
+          );
+        }
       }
       await fetchGraph(activeCampaignId);
       closeAssignModal();
@@ -121,7 +151,56 @@ export default function AssignToCampaignModal() {
             </Box>
           )}
 
-          {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+          {/* Org member auto-assign section */}
+          {entityType === 'org' && selected && (
+            <>
+              <Divider />
+              <Box>
+                {loadingMembers ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="caption" color="text.secondary">Loading members…</Typography>
+                  </Box>
+                ) : orgMembers.length > 0 ? (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={includeMembers}
+                        onChange={(e) => setIncludeMembers(e.target.checked)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        <Group fontSize="small" color="action" />
+                        <Typography variant="body2">
+                          Also assign {orgMembers.length} member{orgMembers.length !== 1 ? 's' : ''} to this campaign
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                ) : (
+                  <Typography variant="caption" color="text.secondary">
+                    No members found in this organization.
+                  </Typography>
+                )}
+                {orgMembers.length > 0 && includeMembers && (
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, ml: 4 }}>
+                    Members use their global influence scores. Connections between them and the org will be visible on the map.
+                  </Typography>
+                )}
+              </Box>
+            </>
+          )}
+
+          {error && <Alert severity="error">{error}</Alert>}
+
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            <Typography variant="caption">
+              <strong>Tip:</strong> Use <em>Assign</em> to add people/orgs that already exist in the database.
+              Use <em>Add Person</em> or <em>Add Org</em> only for brand-new entries.
+            </Typography>
+          </Alert>
         </Box>
       </DialogContent>
       <DialogActions>
